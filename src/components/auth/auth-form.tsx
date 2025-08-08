@@ -109,6 +109,7 @@ export function AuthForm({ mode, onToggleMode }: AuthFormProps) {
                     <FormLabel>Name</FormLabel>
                     <FormControl>
                       <Input
+                        type='text'
                         placeholder='Enter your full name'
                         disabled={isLoading}
                         {...field}
