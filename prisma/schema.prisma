@@ -26,7 +26,7 @@ model User {
   // Messaging related
   sentMessages     Message[] @relation("MessageSender")
   receivedMessages Message[] @relation("MessageReceiver")
-  
+
   @@map("users")
 }
 
@@ -46,6 +46,17 @@ model Account {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  accountId             String
+  providerId            String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  password              String?
+  createdAt             DateTime
+  updatedAt             DateTime
+
   @@unique([provider, providerAccountId])
   @@map("accounts")
 }
@@ -57,7 +68,15 @@ model Session {
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  expiresAt DateTime
+  token     String
+  createdAt DateTime
+  updatedAt DateTime
+  ipAddress String?
+  userAgent String?
+
   @@map("sessions")
+  @@unique([token])
 }
 
 model VerificationToken {
@@ -70,20 +89,28 @@ model VerificationToken {
 }
 
 model Message {
-  id         String   @id @default(cuid())
+  id         String    @id @default(cuid())
   content    String
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  
-  senderId   String   @map("sender_id")
-  receiverId String   @map("receiver_id")
-  
-  sender     User     @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
-  receiver   User     @relation("MessageReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
-  
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  senderId   String    @map("sender_id")
+  receiverId String    @map("receiver_id")
+  sender     User      @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   User      @relation("MessageReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
   // Message status
-  isRead     Boolean  @default(false)
+  isRead     Boolean   @default(false)
   readAt     DateTime?
-  
+
   @@map("messages")
+}
+
+model Verification {
+  id         String    @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime?
+  updatedAt  DateTime?
+
+  @@map("verification")
 }
