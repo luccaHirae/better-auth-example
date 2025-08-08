@@ -15,7 +15,9 @@ export const auth = betterAuth({
     updateAge: 60 * 60 * 24, // 1 day
   },
   advanced: {
-    generateId: false, // Use Prisma's default ID generation
+    database: {
+      generateId: false, // Use Prisma's default ID generation
+    },
   },
   trustedOrigins: ['http://localhost:3000'],
 });
