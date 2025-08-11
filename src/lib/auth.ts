@@ -14,11 +14,6 @@ export const auth = betterAuth({
     expiresIn: 60 * 60 * 24 * 7, // 7 days
     updateAge: 60 * 60 * 24, // 1 day
   },
-  advanced: {
-    database: {
-      generateId: false, // Use Prisma's default ID generation
-    },
-  },
   trustedOrigins: ['http://localhost:3000'],
 });
 
