@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,15 +8,13 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  image     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Authentication fields for Better Auth
-  emailVerified DateTime?
+  id            String    @id
+  name          String
+  email         String
+  emailVerified Boolean
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
   sessions      Session[]
   accounts      Account[]
 
@@ -27,81 +22,43 @@ model User {
   sentMessages     Message[] @relation("MessageSender")
   receivedMessages Message[] @relation("MessageReceiver")
 
+  @@unique([email])
   @@map("users")
 }
 
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([token])
+  @@map("session")
+}
+
 model Account {
-  id                String  @id @default(cuid())
-  userId            String  @map("user_id")
-  type              String
-  provider          String
-  providerAccountId String  @map("provider_account_id")
-  refresh_token     String?
-  access_token      String?
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String?
-  session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  id                    String    @id
   accountId             String
   providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   accessToken           String?
   refreshToken          String?
   idToken               String?
   accessTokenExpiresAt  DateTime?
   refreshTokenExpiresAt DateTime?
+  scope                 String?
   password              String?
-  createdAt             DateTime
-  updatedAt             DateTime
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
-  @@unique([provider, providerAccountId])
-  @@map("accounts")
-}
-
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique @map("session_token")
-  userId       String   @map("user_id")
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  expiresAt DateTime
-  token     String
-  createdAt DateTime
-  updatedAt DateTime
-  ipAddress String?
-  userAgent String?
-
-  @@map("sessions")
-  @@unique([token])
-}
-
-model VerificationToken {
-  identifier String
-  token      String
-  expires    DateTime
-
-  @@unique([identifier, token])
-  @@map("verificationtokens")
-}
-
-model Message {
-  id         String    @id @default(cuid())
-  content    String
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  senderId   String    @map("sender_id")
-  receiverId String    @map("receiver_id")
-  sender     User      @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
-  receiver   User      @relation("MessageReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
-  // Message status
-  isRead     Boolean   @default(false)
-  readAt     DateTime?
-
-  @@map("messages")
+  @@unique([accountId, providerId])
+  @@map("account")
 }
 
 model Verification {
@@ -113,4 +70,20 @@ model Verification {
   updatedAt  DateTime?
 
   @@map("verification")
+}
+
+model Message {
+  id         String    @id @default(cuid())
+  content    String
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  senderId   String
+  receiverId String
+  sender     User      @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   User      @relation("MessageReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  // Message status
+  isRead     Boolean   @default(false)
+  readAt     DateTime?
+
+  @@map("messages")
 }
