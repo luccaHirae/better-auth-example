@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { MessageCircle, User, Settings } from 'lucide-react';
 import { authClient } from '@/lib/auth-client';
 
 export default function DashboardPage() {
@@ -53,7 +54,10 @@ export default function DashboardPage() {
         <div className='grid gap-6 md:grid-cols-2 lg:grid-cols-3'>
           <Card>
             <CardHeader>
-              <CardTitle>Profile</CardTitle>
+              <CardTitle className='flex items-center gap-2'>
+                <User className='w-5 h-5' />
+                Profile
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className='space-y-2'>
@@ -72,21 +76,31 @@ export default function DashboardPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Messages</CardTitle>
+              <CardTitle className='flex items-center gap-2'>
+                <MessageCircle className='w-5 h-5' />
+                Messages
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <p className='text-gray-600 mb-4'>
-                Real-time messaging feature coming soon in Phase 2!
+                Start real-time conversations with other users!
               </p>
-              <Button disabled className='w-full'>
-                Start Messaging
+              <Button
+                onClick={() => router.push('/messages')}
+                className='w-full'
+              >
+                <MessageCircle className='w-4 h-4 mr-2' />
+                Open Messages
               </Button>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>Settings</CardTitle>
+              <CardTitle className='flex items-center gap-2'>
+                <Settings className='w-5 h-5' />
+                Settings
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <Button
