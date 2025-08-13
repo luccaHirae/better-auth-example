@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { MessageCircle, Search, Plus } from 'lucide-react';
+import { MessageCircle, Search, Plus, Loader2 } from 'lucide-react';
+import { useConversations, useCreateConversation } from '@/hooks/useQueries';
+import { toast } from 'sonner';
 
 interface Conversation {
   id: string;
@@ -24,70 +26,29 @@ export default function ConversationList({
   onSelectConversation,
   selectedConversationId,
 }: ConversationListProps) {
-  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [newChatEmail, setNewChatEmail] = useState('');
   const [showNewChat, setShowNewChat] = useState(false);
 
-  // Mock conversations for now - in a real app, this would come from an API
-  useEffect(() => {
-    // Simulated conversations
-    const mockConversations: Conversation[] = [
-      {
-        id: 'conv_1',
-        participantId: 'user_2',
-        participantName: 'Alice Johnson',
-        participantEmail: 'alice@example.com',
-        lastMessage: 'Hey, how are you doing?',
-        lastMessageTime: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 minutes ago
-        unreadCount: 2,
-      },
-      {
-        id: 'conv_2',
-        participantId: 'user_3',
-        participantName: 'Bob Smith',
-        participantEmail: 'bob@example.com',
-        lastMessage: 'Thanks for the help earlier!',
-        lastMessageTime: new Date(
-          Date.now() - 1000 * 60 * 60 * 2
-        ).toISOString(), // 2 hours ago
-        unreadCount: 0,
-      },
-      {
-        id: 'conv_3',
-        participantId: 'user_4',
-        participantName: 'Carol Williams',
-        participantEmail: 'carol@example.com',
-        lastMessage: 'See you tomorrow!',
-        lastMessageTime: new Date(
-          Date.now() - 1000 * 60 * 60 * 24
-        ).toISOString(), // 1 day ago
-        unreadCount: 1,
-      },
-    ];
+  // Use React Query hooks
+  const { data: conversations = [], isLoading, error } = useConversations();
+  const createConversationMutation = useCreateConversation();
 
-    setConversations(mockConversations);
-  }, []);
-
-  const handleNewChat = (e: React.FormEvent) => {
+  const handleNewChat = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newChatEmail.trim()) return;
 
-    // Create a new conversation
-    const newConversation: Conversation = {
-      id: `conv_${Date.now()}`,
-      participantId: `user_${Date.now()}`,
-      participantName: newChatEmail.split('@')[0], // Simple name from email
-      participantEmail: newChatEmail,
-      lastMessage: undefined,
-      lastMessageTime: undefined,
-      unreadCount: 0,
-    };
-
-    setConversations((prev) => [newConversation, ...prev]);
-    setNewChatEmail('');
-    setShowNewChat(false);
-    onSelectConversation(newConversation);
+    try {
+      const newConversation = await createConversationMutation.mutateAsync(
+        newChatEmail
+      );
+      setNewChatEmail('');
+      setShowNewChat(false);
+      onSelectConversation(newConversation);
+      toast.success('Conversation created successfully');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to create conversation');
+    }
   };
 
   const filteredConversations = conversations.filter(
@@ -148,14 +109,27 @@ export default function ConversationList({
                 type='email'
               />
               <div className='flex gap-2'>
-                <Button type='submit' size='sm' className='flex-1'>
-                  Start Chat
+                <Button
+                  type='submit'
+                  size='sm'
+                  className='flex-1'
+                  disabled={createConversationMutation.isPending}
+                >
+                  {createConversationMutation.isPending ? (
+                    <>
+                      <Loader2 className='w-4 h-4 animate-spin mr-2' />
+                      Creating...
+                    </>
+                  ) : (
+                    'Start Chat'
+                  )}
                 </Button>
                 <Button
                   type='button'
                   variant='outline'
                   size='sm'
                   onClick={() => setShowNewChat(false)}
+                  disabled={createConversationMutation.isPending}
                 >
                   Cancel
                 </Button>
@@ -166,52 +140,70 @@ export default function ConversationList({
       </CardHeader>
 
       <CardContent className='p-0'>
-        <div className='space-y-1'>
-          {filteredConversations.length === 0 ? (
-            <div className='p-4 text-center text-muted-foreground'>
-              {searchQuery ? 'No conversations found' : 'No conversations yet'}
-            </div>
-          ) : (
-            filteredConversations.map((conversation) => (
-              <button
-                key={conversation.id}
-                onClick={() => onSelectConversation(conversation)}
-                className={`w-full text-left p-4 hover:bg-muted transition-colors border-b border-border last:border-b-0 ${
-                  selectedConversationId === conversation.id ? 'bg-muted' : ''
-                }`}
-              >
-                <div className='flex items-start justify-between'>
-                  <div className='flex-1 min-w-0'>
-                    <div className='flex items-center gap-2'>
-                      <div className='font-medium truncate'>
-                        {conversation.participantName}
+        {isLoading ? (
+          <div className='p-4 flex items-center justify-center'>
+            <Loader2 className='w-6 h-6 animate-spin' />
+            <span className='ml-2'>Loading conversations...</span>
+          </div>
+        ) : error ? (
+          <div className='p-4 text-center text-red-600'>
+            Failed to load conversations
+          </div>
+        ) : (
+          <div className='space-y-1'>
+            {filteredConversations.length === 0 ? (
+              <div className='p-4 text-center text-muted-foreground'>
+                {searchQuery
+                  ? 'No conversations found'
+                  : 'No conversations yet'}
+                {!searchQuery && (
+                  <div className='mt-2 text-sm'>
+                    Click the + button to start a new conversation
+                  </div>
+                )}
+              </div>
+            ) : (
+              filteredConversations.map((conversation) => (
+                <button
+                  key={conversation.id}
+                  onClick={() => onSelectConversation(conversation)}
+                  className={`w-full text-left p-4 hover:bg-muted transition-colors border-b border-border last:border-b-0 ${
+                    selectedConversationId === conversation.id ? 'bg-muted' : ''
+                  }`}
+                >
+                  <div className='flex items-start justify-between'>
+                    <div className='flex-1 min-w-0'>
+                      <div className='flex items-center gap-2'>
+                        <div className='font-medium truncate'>
+                          {conversation.participantName}
+                        </div>
+                        {conversation.unreadCount &&
+                          conversation.unreadCount > 0 && (
+                            <Badge variant='default' className='text-xs'>
+                              {conversation.unreadCount}
+                            </Badge>
+                          )}
                       </div>
-                      {conversation.unreadCount &&
-                        conversation.unreadCount > 0 && (
-                          <Badge variant='default' className='text-xs'>
-                            {conversation.unreadCount}
-                          </Badge>
-                        )}
+                      <div className='text-sm text-muted-foreground truncate'>
+                        {conversation.participantEmail}
+                      </div>
+                      {conversation.lastMessage && (
+                        <div className='text-sm text-muted-foreground truncate mt-1'>
+                          {conversation.lastMessage}
+                        </div>
+                      )}
                     </div>
-                    <div className='text-sm text-muted-foreground truncate'>
-                      {conversation.participantEmail}
-                    </div>
-                    {conversation.lastMessage && (
-                      <div className='text-sm text-muted-foreground truncate mt-1'>
-                        {conversation.lastMessage}
+                    {conversation.lastMessageTime && (
+                      <div className='text-xs text-muted-foreground ml-2'>
+                        {formatTime(conversation.lastMessageTime)}
                       </div>
                     )}
                   </div>
-                  {conversation.lastMessageTime && (
-                    <div className='text-xs text-muted-foreground ml-2'>
-                      {formatTime(conversation.lastMessageTime)}
-                    </div>
-                  )}
-                </div>
-              </button>
-            ))
-          )}
-        </div>
+                </button>
+              ))
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
