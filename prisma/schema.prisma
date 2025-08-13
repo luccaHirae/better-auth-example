@@ -19,8 +19,8 @@ model User {
   accounts      Account[]
 
   // Messaging related
-  sentMessages     Message[] @relation("MessageSender")
-  receivedMessages Message[] @relation("MessageReceiver")
+  sentMessages  Message[]      @relation("MessageSender")
+  conversations Conversation[] @relation("ConversationParticipant")
 
   @@unique([email])
   @@map("users")
@@ -72,18 +72,28 @@ model Verification {
   @@map("verification")
 }
 
+model Conversation {
+  id           String    @id @default(cuid())
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  participants User[]    @relation("ConversationParticipant")
+  messages     Message[]
+
+  @@map("conversations")
+}
+
 model Message {
-  id         String    @id @default(cuid())
-  content    String
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  senderId   String
-  receiverId String
-  sender     User      @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
-  receiver   User      @relation("MessageReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  id             String       @id @default(cuid())
+  content        String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  senderId       String
+  conversationId String
+  sender         User         @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   // Message status
-  isRead     Boolean   @default(false)
-  readAt     DateTime?
+  isRead         Boolean      @default(false)
+  readAt         DateTime?
 
   @@map("messages")
 }
