@@ -61,13 +61,13 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className='space-y-2'>
-                <p>
+                <p className='truncate'>
                   <strong>Name:</strong> {session.user.name || 'Not provided'}
                 </p>
-                <p>
+                <p className='truncate'>
                   <strong>Email:</strong> {session.user.email}
                 </p>
-                <p>
+                <p className='truncate'>
                   <strong>ID:</strong> {session.user.id}
                 </p>
               </div>
