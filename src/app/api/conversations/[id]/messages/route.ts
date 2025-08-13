@@ -10,6 +10,8 @@ interface RouteParams {
 
 export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
+    const { id: conversationId } = await params;
+
     const session = await auth.api.getSession({
       headers: request.headers as any,
     });
@@ -17,8 +19,6 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     if (!session?.user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-
-    const conversationId = await params.id;
 
     // Verify user is part of this conversation
     const conversation = await prisma.conversation.findFirst({
