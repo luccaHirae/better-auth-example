@@ -1,27 +1,31 @@
-import { useState, useEffect, useRef } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
-import { Send, Users } from 'lucide-react';
-import { useSocket } from '@/hooks/useSocket';
-import { useSession } from '@/lib/auth-client';
+import { useState, useEffect, useRef } from 'react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Badge } from '@/components/ui/badge'
+import { Send, Users, Loader2 } from 'lucide-react'
+import { useSocket } from '@/hooks/useSocket'
+import { useSession } from '@/lib/auth-client'
+import { useMessages, useSendMessage, useAddMessageToCache } from '@/hooks/useQueries'
+import { toast } from 'sonner'
 
 interface Message {
-  id: string;
-  content: string;
-  senderId: string;
-  receiverId: string;
-  senderName: string;
-  createdAt: string;
-  isRead: boolean;
+  id: string
+  content: string
+  senderId: string
+  senderName: string
+  senderEmail: string
+  createdAt: string
+  isRead: boolean
+  readAt?: string
+  conversationId: string
 }
 
 interface ChatRoomProps {
-  conversationId: string;
-  receiverId: string;
-  receiverName: string;
+  conversationId: string
+  receiverId: string
+  receiverName: string
 }
 
 export default function ChatRoom({
@@ -29,7 +33,6 @@ export default function ChatRoom({
   receiverId,
   receiverName,
 }: ChatRoomProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [typingUser, setTypingUser] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
@@ -46,6 +49,11 @@ export default function ChatRoom({
     stopTyping,
   } = useSocket();
   const { data: session } = useSession();
+  
+  // Use React Query hooks
+  const { data: messages = [], isLoading, error } = useMessages(conversationId);
+  const sendMessageMutation = useSendMessage(conversationId);
+  const addMessageToCache = useAddMessageToCache();
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -55,9 +63,20 @@ export default function ChatRoom({
     if (socket && isConnected) {
       joinConversation(conversationId);
 
-      // Listen for new messages
-      socket.on('receive-message', (message: Message) => {
-        setMessages((prev) => [...prev, message]);
+      // Listen for new messages from other users
+      socket.on('receive-message', (message: any) => {
+        // Add message to React Query cache
+        addMessageToCache({
+          id: message.id,
+          content: message.content,
+          senderId: message.senderId,
+          senderName: message.senderName,
+          senderEmail: message.senderEmail || '',
+          createdAt: message.createdAt,
+          isRead: message.isRead,
+          readAt: message.readAt,
+          conversationId: conversationId,
+        });
       });
 
       // Listen for message confirmations
@@ -82,36 +101,30 @@ export default function ChatRoom({
         leaveConversation(conversationId);
       };
     }
-  }, [socket, isConnected, conversationId]);
+  }, [socket, isConnected, conversationId, addMessageToCache, joinConversation, leaveConversation]);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
-  const handleSendMessage = (e: React.FormEvent) => {
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!newMessage.trim() || !session?.user) return;
 
-    const message: Message = {
-      id: `temp_${Date.now()}`,
-      content: newMessage,
-      senderId: session.user.id,
-      receiverId,
-      senderName: session.user.name,
-      createdAt: new Date().toISOString(),
-      isRead: false,
-    };
+    try {
+      // Send via database first
+      const savedMessage = await sendMessageMutation.mutateAsync(newMessage);
 
-    // Add message to local state immediately (optimistic update)
-    setMessages((prev) => [...prev, message]);
+      // Then send via socket for real-time updates to other users
+      sendMessage(conversationId, newMessage, receiverId);
 
-    // Send via socket
-    sendMessage(conversationId, newMessage, receiverId);
-
-    setNewMessage('');
-    stopTyping(conversationId);
-    setIsTyping(false);
+      setNewMessage('');
+      stopTyping(conversationId);
+      setIsTyping(false);
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to send message');
+    }
   };
 
   const handleTyping = (value: string) => {
@@ -140,6 +153,43 @@ export default function ChatRoom({
       minute: '2-digit',
     });
   };
+
+  if (isLoading) {
+    return (
+      <Card className="flex-1 flex flex-col">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2">
+            <Users className="w-5 h-5" />
+            Chat with {receiverName}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex-1 flex items-center justify-center">
+          <div className="flex items-center">
+            <Loader2 className="w-6 h-6 animate-spin mr-2" />
+            Loading messages...
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="flex-1 flex flex-col">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2">
+            <Users className="w-5 h-5" />
+            Chat with {receiverName}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex-1 flex items-center justify-center">
+          <div className="text-red-600 text-center">
+            Failed to load messages
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className='flex flex-col h-full'>
@@ -220,9 +270,13 @@ export default function ChatRoom({
               />
               <Button
                 type='submit'
-                disabled={!newMessage.trim() || !isConnected}
+                disabled={!newMessage.trim() || !isConnected || sendMessageMutation.isPending}
               >
-                <Send className='w-4 h-4' />
+                {sendMessageMutation.isPending ? (
+                  <Loader2 className='w-4 h-4 animate-spin' />
+                ) : (
+                  <Send className='w-4 h-4' />
+                )}
               </Button>
             </form>
           </div>
